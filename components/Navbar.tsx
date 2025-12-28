@@ -1,6 +1,6 @@
 "use client";
 
-import { logout } from "@/lib/auth"; // Ensure this path is correct based on your folder structure
+import { logout } from "@/lib/auth"; // Make sure the path is correct
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -12,7 +12,6 @@ export default function Navbar() {
     setIsLoggingOut(true);
     try {
       await logout();
-      // Redirect to login page after successful cleanup
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -23,27 +22,44 @@ export default function Navbar() {
   };
 
   return (
-    <nav style={{ 
-      padding: "1rem 2rem", 
-      display: "flex", 
-      justifyContent: "space-between", 
+    <nav style={{
+      padding: "1rem 2rem",
+      display: "flex",
+      justifyContent: "space-between",
       alignItems: "center",
       backgroundColor: "#ffffff",
-      borderBottom: "1px solid #eaeaea"
+      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+      borderBottom: "1px solid #e0e0e0"
     }}>
-      <h3 style={{ margin: 0, color: "#4285F4" }}>Email Tracker AI</h3>
-      
+      <h3 style={{
+        margin: 0,
+        color: "#111",
+        fontSize: "1.5rem",
+        fontWeight: "bold",
+        letterSpacing: "0.5px"
+      }}>
+        Jobsy
+      </h3>
+
       <button
         onClick={handleLogout}
         disabled={isLoggingOut}
         style={{
-          padding: "8px 16px",
-          backgroundColor: isLoggingOut ? "#ccc" : "#f44336",
-          color: "white",
+          padding: "8px 20px",
+          backgroundColor: isLoggingOut ? "#aaa" : "#111",
+          color: "#fff",
           border: "none",
-          borderRadius: "4px",
+          borderRadius: "6px",
           cursor: isLoggingOut ? "not-allowed" : "pointer",
-          fontWeight: "bold"
+          fontWeight: "600",
+          transition: "all 0.2s",
+          fontSize: "0.9rem"
+        }}
+        onMouseEnter={(e) => {
+          if (!isLoggingOut) e.currentTarget.style.backgroundColor = "#333";
+        }}
+        onMouseLeave={(e) => {
+          if (!isLoggingOut) e.currentTarget.style.backgroundColor = "#111";
         }}
       >
         {isLoggingOut ? "Logging out..." : "Logout"}

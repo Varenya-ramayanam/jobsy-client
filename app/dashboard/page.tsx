@@ -4,14 +4,13 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import JobCard from "@/components/JobCard";
 import { db, auth } from "@/lib/firebase";
-import { collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 
 // Define a type for our application data
 interface JobApplication {
   id: string;
-  company?: string;
   status: string;
   snippet: string;
   timestamp: any;
@@ -28,12 +27,8 @@ export default function DashboardPage() {
   // 🔐 Authenticate and set UID
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("Logged in as UID:", user.uid);
-        setUid(user.uid);
-      } else {
-        setUid(null);
-      }
+      if (user) setUid(user.uid);
+      else setUid(null);
     });
     return () => unsubAuth();
   }, []);
@@ -42,7 +37,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!uid) return;
 
-    // We filter by 'userId' to ensure privacy and accuracy
     const q = query(
       collection(db, "job_applications"), 
       where("userId", "==", uid)
@@ -66,7 +60,6 @@ export default function DashboardPage() {
         });
       });
 
-      console.log(`Fetched ${apps.length} records for user ${uid}`);
       setApplications(apps);
       setShortlisted(s);
       setRejected(r);
@@ -87,30 +80,18 @@ export default function DashboardPage() {
 
     try {
       const accessToken = localStorage.getItem("google_access_token"); 
-
-      if (!accessToken) {
-        throw new Error("Missing Google Access Token. Please sign in again.");
-      }
-
-      console.log("Starting sync for UID:", uid);
+      if (!accessToken) throw new Error("Missing Google Access Token. Please sign in again.");
 
       const res = await fetch("https://jobsy-email-tracking.onrender.com/api/process-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          accessToken, 
-          userId: uid // 🚀 This is sent to your backend's req.body
-        }), 
+        body: JSON.stringify({ accessToken, userId: uid }), 
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to process emails");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to process emails");
       
       console.log("Sync response:", data);
-      
     } catch (err: any) {
       console.error("Sync Error:", err.message);
       setError(err.message);
@@ -124,18 +105,19 @@ export default function DashboardPage() {
       <Navbar />
 
       <div style={{ padding: 24, maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
+        {/* Header + Sync */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
           <div>
             <h2 style={{ margin: 0 }}>Job Tracker Dashboard</h2>
-            <p style={{ fontSize: "12px", color: "#666", marginTop: 4 }}></p>
+            <p style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>Track and manage your job applications automatically.</p>
           </div>
           <button 
             onClick={syncEmails} 
             disabled={syncing || !uid}
             style={{
               padding: "12px 24px",
-              backgroundColor: syncing ? "#eaeaea" : "#4285F4",
-              color: "white",
+              backgroundColor: syncing ? "#e0e0e0" : "#111",
+              color: "#fff",
               border: "none",
               borderRadius: 8,
               fontWeight: "bold",
@@ -147,6 +129,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* Error Message */}
         {error && (
           <div style={{ backgroundColor: "#fee2e2", color: "#b91c1c", padding: "12px 16px", borderRadius: 8, marginBottom: 20, fontSize: "14px", border: "1px solid #fecaca" }}>
             ⚠️ <strong>Error:</strong> {error}
@@ -181,9 +164,9 @@ export default function DashboardPage() {
                 backgroundColor: "#fff",
                 boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
               }}>
-                <div style={{ flex: 1, marginRight: 24 }}>
-                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#aaa", letterSpacing: "0.5px" }}>EMAIL SOURCE</span>
-                  <p style={{ margin: "8px 0 0 0", fontSize: "14px", color: "#444", lineHeight: "1.5" }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#aaa", letterSpacing: "0.5px" }}>EMAIL SNIPPET</span>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#444", lineHeight: "1.5" }}>
                     {app.snippet}
                   </p>
                 </div>
