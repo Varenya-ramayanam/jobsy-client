@@ -94,7 +94,7 @@ export default function DashboardPage() {
 
       console.log("Starting sync for UID:", uid);
 
-      const res = await fetch("http://localhost:5000/api/process-emails", {
+      const res = await fetch("https://jobsy-email-tracking.onrender.com/process-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -127,7 +127,7 @@ export default function DashboardPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
           <div>
             <h2 style={{ margin: 0 }}>Job Tracker Dashboard</h2>
-            <p style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>UID: {uid || "Loading..."}</p>
+            <p style={{ fontSize: "12px", color: "#666", marginTop: 4 }}></p>
           </div>
           <button 
             onClick={syncEmails} 
