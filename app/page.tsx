@@ -94,7 +94,7 @@ export default function DashboardPage() {
 
       console.log("Starting sync for UID:", uid);
 
-      const res = await fetch("https://jobsy-email-tracking.onrender.com/process-emails", {
+      const res = await fetch("https://jobsy-email-tracking.onrender.com/api/process-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
