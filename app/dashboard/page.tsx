@@ -12,6 +12,7 @@ import { onAuthStateChanged } from "firebase/auth";
 interface JobApplication {
   id: string;
   status: string;
+  company: string;
   snippet: string;
   timestamp: any;
 }
@@ -55,8 +56,9 @@ export default function DashboardPage() {
         apps.push({
           id: doc.id,
           status: data.status,
-          snippet: data.snippet,
+          company: data.company,
           timestamp: data.timestamp,
+          snippet: data.snippet,
         });
       });
 
@@ -165,7 +167,7 @@ export default function DashboardPage() {
                 boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
               }}>
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#aaa", letterSpacing: "0.5px" }}>EMAIL SNIPPET</span>
+                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#aaa", letterSpacing: "0.5px" }}>{app.company}</span>
                   <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#444", lineHeight: "1.5" }}>
                     {app.snippet}
                   </p>
