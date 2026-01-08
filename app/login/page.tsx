@@ -35,7 +35,7 @@ export default function LoginPage() {
     {
       icon: <FaLinkedin className="text-gray-800 w-6 h-6" />,
       title: "LinkedIn Apply",
-      desc: "Apply to LinkedIn easy-apply jobs automatically (Feature will be added later)",
+      desc: "Apply to LinkedIn easy-apply jobs automatically (This functionality is restricted to local testing)",
     },
   ];
 

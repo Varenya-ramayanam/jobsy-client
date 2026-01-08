@@ -2,13 +2,12 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
-import JobCard from "@/components/JobCard";
+import AutoApplyFilterModal from "@/components/AutoApplyFilterModal";
 import { db, auth } from "@/lib/firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 
-// Define a type for our application data
 interface JobApplication {
   id: string;
   status: string;
@@ -19,86 +18,99 @@ interface JobApplication {
 
 export default function DashboardPage() {
   const [applications, setApplications] = useState<JobApplication[]>([]);
-  const [shortlisted, setShortlisted] = useState(0);
-  const [rejected, setRejected] = useState(0);
+  const [shortlistedCount, setShortlistedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // 🔐 Authenticate and set UID
+  // ============================
+  // AUTH STATE
+  // ============================
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (user) setUid(user.uid);
-      else setUid(null);
+      setUid(user ? user.uid : null);
     });
     return () => unsubAuth();
   }, []);
 
-  // 📊 Real-time Firestore Listener
+  // ============================
+  // FIRESTORE LISTENER
+  // ============================
   useEffect(() => {
     if (!uid) return;
 
     const q = query(
-      collection(db, "job_applications"), 
-      where("userId", "==", uid)
+      collection(db, "job_applications"),
+      where("userId", "==", uid),
+      where("status", "==", "Shortlisted")
     );
 
     const unsubSnapshot = onSnapshot(q, (snapshot) => {
-      let s = 0;
-      let r = 0;
-      const apps: JobApplication[] = [];
-
-      snapshot.docs.forEach((doc) => {
+      const apps: JobApplication[] = snapshot.docs.map((doc) => {
         const data = doc.data();
-        if (data.status === "Shortlisted") s++;
-        if (data.status === "Rejected") r++;
-        
-        apps.push({
+        return {
           id: doc.id,
           status: data.status,
           company: data.company,
-          timestamp: data.timestamp,
           snippet: data.snippet,
-        });
+          timestamp: data.timestamp,
+        };
       });
 
       setApplications(apps);
-      setShortlisted(s);
-      setRejected(r);
+      setShortlistedCount(apps.length);
     });
 
     return () => unsubSnapshot();
   }, [uid]);
 
-  // 🔄 Syncing Logic
+  // ============================
+  // GMAIL SYNC
+  // ============================
   const syncEmails = async () => {
-    if (!uid) {
-      setError("No user ID found. Please refresh and log in.");
-      return;
-    }
-
+    if (!uid) return setError("User not authenticated.");
     setSyncing(true);
     setError(null);
 
     try {
-      const accessToken = localStorage.getItem("google_access_token"); 
-      if (!accessToken) throw new Error("Missing Google Access Token. Please sign in again.");
+      const accessToken = localStorage.getItem("google_access_token");
+      if (!accessToken)
+        throw new Error("Sign in with Google again to refresh access.");
 
-      const res = await fetch("https://jobsy-email-tracking.onrender.com/api/process-emails", {
+      const res = await fetch("http://localhost:5000/api/process-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken, userId: uid }), 
+        body: JSON.stringify({ accessToken, userId: uid }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process emails");
-      
-      console.log("Sync response:", data);
+      if (!res.ok) throw new Error("AI Scan failed to connect.");
     } catch (err: any) {
-      console.error("Sync Error:", err.message);
       setError(err.message);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // ============================
+  // AUTO APPLY
+  // ============================
+  const proceedAutoApply = async (filters: any) => {
+    setApplying(true);
+    try {
+      const res = await fetch("http://localhost:8080/api/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filters }),
+      });
+
+      const data = await res.json();
+      alert(data.message || "Auto-Apply started successfully");
+    } catch {
+      alert("Auto-Apply service is offline.");
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -106,88 +118,103 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <Navbar />
 
-      <div style={{ padding: 24, maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
-        {/* Header + Sync */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+      <AutoApplyFilterModal
+        open={showFilters}
+        onClose={() => setShowFilters(false)}
+        onProceed={proceedAutoApply}
+      />
+
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* HEADER */}
+        <div className="flex justify-between items-center mb-10">
           <div>
-            <h2 style={{ margin: 0 }}>Job Tracker Dashboard</h2>
-            <p style={{ fontSize: "12px", color: "#666", marginTop: 4 }}>Track and manage your job applications automatically.</p>
-          </div>
-          <button 
-            onClick={syncEmails} 
-            disabled={syncing || !uid}
-            style={{
-              padding: "12px 24px",
-              backgroundColor: syncing ? "#e0e0e0" : "#111",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontWeight: "bold",
-              cursor: syncing ? "not-allowed" : "pointer",
-              transition: "0.2s"
-            }}
-          >
-            {syncing ? "AI Scanning Inbox..." : "Sync with Gmail AI"}
-          </button>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div style={{ backgroundColor: "#fee2e2", color: "#b91c1c", padding: "12px 16px", borderRadius: 8, marginBottom: 20, fontSize: "14px", border: "1px solid #fecaca" }}>
-            ⚠️ <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {/* STAT CARDS */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 40 }}>
-          <JobCard title="Shortlisted" count={shortlisted} />
-          <JobCard title="Rejected" count={rejected} />
-          <JobCard title="Total Tracked" count={applications.length} />
-        </div>
-
-        {/* LIST VIEW */}
-        <h3 style={{ marginBottom: 16 }}>Live Application Stream</h3>
-        {applications.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px", border: "2px dashed #ddd", borderRadius: 12, backgroundColor: "#fcfcfc" }}>
-            <p style={{ color: "#888", fontSize: "16px" }}>
-              {syncing ? "Searching for job updates..." : "No applications tracked yet. Click the Sync button to scan your Gmail!"}
+            <h1 className="text-3xl font-extrabold">Career Pipeline</h1>
+            <p className="text-gray-500 mt-1">
+              AI-powered tracking & automated job applications
             </p>
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {applications.map((app) => (
-              <div key={app.id} style={{ 
-                padding: "20px", 
-                borderRadius: 12, 
-                border: "1px solid #efefef",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                backgroundColor: "#fff",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-              }}>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: "10px", fontWeight: "bold", color: "#aaa", letterSpacing: "0.5px" }}>{app.company}</span>
-                  <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#444", lineHeight: "1.5" }}>
-                    {app.snippet}
-                  </p>
-                </div>
-                <div style={{ 
-                  padding: "6px 14px", 
-                  borderRadius: 6, 
-                  fontSize: "11px", 
-                  fontWeight: "800",
-                  letterSpacing: "0.5px",
-                  backgroundColor: app.status === "Shortlisted" ? "#ecfdf5" : "#fff1f2",
-                  color: app.status === "Shortlisted" ? "#059669" : "#e11d48",
-                  border: `1px solid ${app.status === "Shortlisted" ? "#a7f3d0" : "#fecdd3"}`
-                }}>
-                  {app.status.toUpperCase()}
-                </div>
-              </div>
-            ))}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowFilters(true)}
+              disabled={true} // <--- Disabled permanently
+              className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-60"
+            >
+              🚫 Auto-Apply Disabled (This functionality is restricted to local testing)
+            </button>
+
+            <button
+              onClick={syncEmails}
+              disabled={syncing}
+              className="px-4 py-2 rounded-lg border disabled:opacity-60"
+            >
+              {syncing ? "⌛ Syncing..." : "🔄 Sync Gmail"}
+            </button>
+          </div>
+        </div>
+
+        {/* ERROR */}
+        {error && (
+          <div className="bg-red-100 text-red-700 px-4 py-3 rounded mb-6">
+            {error}
           </div>
         )}
+
+        {/* STATS */}
+        <div className="grid grid-cols-2 gap-6 mb-12">
+          <div className="border rounded-xl p-6">
+            <p className="text-gray-500">SHORTLISTED</p>
+            <h2 className="text-3xl font-bold mt-2">{shortlistedCount}</h2>
+          </div>
+          <div className="border rounded-xl p-6">
+            <p className="text-gray-500">TOTAL TRACKED</p>
+            <h2 className="text-3xl font-bold mt-2">{applications.length}</h2>
+          </div>
+        </div>
+
+        {/* SHORTLISTED TABLE */}
+        <div>
+          <h2 className="text-xl font-bold mb-4">
+            📬 Shortlisted Applications
+          </h2>
+
+          {applications.length === 0 ? (
+            <p className="text-gray-500">
+              No shortlisted emails yet. Sync Gmail to fetch updates.
+            </p>
+          ) : (
+            <div className="overflow-x-auto border rounded-xl">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-3">Company</th>
+                    <th className="px-4 py-3">Snippet</th>
+                    <th className="px-4 py-3">Received</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map((app) => (
+                    <tr key={app.id} className="border-t">
+                      <td className="px-4 py-3 font-medium">
+                        {app.company}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {app.snippet}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {app.timestamp
+                          ? new Date(
+                              app.timestamp.seconds * 1000
+                            ).toLocaleString()
+                          : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </ProtectedRoute>
   );
